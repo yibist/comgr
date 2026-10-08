@@ -8,6 +8,8 @@ using System.Numerics;
 using Avalonia.Controls.ApplicationLifetimes;
 using Vector = Avalonia.Vector;
 
+//https://chat.deepseek.com/share/urrfadium1wwjfqfbe
+
 class Program
 {
     static void Main(string[] args)
@@ -37,18 +39,28 @@ public class App : Application
 public class MainWindow : Window
 {
     private Image imageControl;
-    private WriteableBitmap? bitmap;
-    private Vector3[,]? vectors;
+    private WriteableBitmap bitmap;
+    private Vector3[,] colors;
 
-    private const int imageWidth = 500;
-    private const int imageHeight = 500;
-    private const int calculationThreads = 1;
+    private const int imageWidth = 800;
+    private const int imageHeight = 800;
+    private int calculationThreads = 8;
+
+    private float FOV = (float)(36.0f * (Math.PI / 180f));
+    private Vector3 eye = new Vector3(0.0f, 0.0f, -4);
+    private Vector3 up = new Vector3(0.0f, 1.0f, 0.0f);
+    private Vector3 lookAt = new Vector3(0.0f, 0.0f, 6.0f);
+    private float p = 0.5f;
+    private int bounceDepth = int.MaxValue;
+
 
     public MainWindow()
     {
-        Title = "Multithreaded Image Generation";
-        Width = 500;
-        Height = 500;
+        calculationThreads = Math.Max(1, Environment.ProcessorCount - 2);
+        initScene();
+        Title = "comgr";
+        Width = imageWidth;
+        Height = imageHeight;
 
         imageControl = new Image
         {
@@ -59,7 +71,15 @@ public class MainWindow : Window
 
         Content = imageControl;
 
-        vectors = new Vector3[imageHeight, imageWidth];
+        colors = new Vector3[imageHeight, imageWidth];
+
+        bitmap = new WriteableBitmap(
+            new PixelSize(imageWidth, imageHeight),
+            new Vector(96, 96),
+            PixelFormat.Bgra8888,
+            AlphaFormat.Premul);
+
+        imageControl.Source = bitmap;
 
         for (int i = 0; i < calculationThreads; i++)
         {
@@ -67,84 +87,43 @@ public class MainWindow : Window
             Task.Run(() => CalculationWorker(threadId));
         }
 
-        Task.Run(() => RenderWorker());
-
         var timer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(16)
         };
-        timer.Tick += (s, e) =>
-        {
-            if (bitmap != null)
-            {
-                imageControl.Source = bitmap;
-                InvalidateVisual();
-            }
-        };
+        timer.Tick += (s, e) => RenderFrame();
         timer.Start();
     }
 
-    private void CalculationWorker(int threadId)
+    private unsafe void RenderFrame()
     {
-        var random = new Random(threadId * 1337 + Environment.TickCount);
-
-        int rowsPerThread = imageHeight / calculationThreads;
-        int startRow = threadId * rowsPerThread;
-        int endRow = (threadId == calculationThreads - 1) ? imageHeight : startRow + rowsPerThread;
-
-
-        while (true)
+        using (var fb = bitmap.Lock())
         {
-            for (int y = startRow; y < endRow; y++)
+            var ptr = (byte*)fb.Address;
+            var stride = fb.RowBytes;
+
+            for (int y = 0; y < imageHeight; y++)
             {
+                var rowPtr = ptr + y * stride;
+
                 for (int x = 0; x < imageWidth; x++)
                 {
-                    vectors[y, x] = new Vector3(1, 1, 1);
+                    Vector3 vec = colors[y, x];
+
+                    byte r = LinearToSRGB(vec.X);
+                    byte g = LinearToSRGB(vec.Y);
+                    byte b = LinearToSRGB(vec.Z);
+
+                    int pixelOffset = x * 4;
+                    rowPtr[pixelOffset + 0] = b;
+                    rowPtr[pixelOffset + 1] = g;
+                    rowPtr[pixelOffset + 2] = r;
+                    rowPtr[pixelOffset + 3] = 255;
                 }
             }
-
-            Thread.Sleep(16);
         }
-    }
 
-    private unsafe void RenderWorker()
-    {
-        bitmap = new WriteableBitmap(
-            new PixelSize(imageWidth, imageHeight),
-            new Vector(96, 96),
-            PixelFormat.Bgra8888,
-            AlphaFormat.Premul);
-
-        while (true)
-        {
-            using (var fb = bitmap.Lock())
-            {
-                var ptr = (byte*)fb.Address;
-                var stride = fb.RowBytes;
-
-                for (int y = 0; y < imageHeight; y++)
-                {
-                    var rowPtr = ptr + y * stride;
-
-                    for (int x = 0; x < imageWidth; x++)
-                    {
-                        Vector3 vec = vectors[y, x];
-
-                        byte r = LinearToSRGB(vec.X);
-                        byte g = LinearToSRGB(vec.Y);
-                        byte b = LinearToSRGB(vec.Z);
-
-                        int pixelOffset = x * 4;
-                        rowPtr[pixelOffset + 0] = b;
-                        rowPtr[pixelOffset + 1] = g;
-                        rowPtr[pixelOffset + 2] = r;
-                        rowPtr[pixelOffset + 3] = 255;
-                    }
-                }
-            }
-
-            Thread.Sleep(1000);
-        }
+        imageControl.InvalidateVisual();
     }
 
     private static byte LinearToSRGB(float linear)
@@ -162,5 +141,224 @@ public class MainWindow : Window
         }
 
         return (byte)(srgb * 255 + 0.5f);
+    }
+    // above this is all ai;
+
+    private List<Sphere> scene = new List<Sphere>();
+
+    private void initScene()
+    {
+        scene.Add(new Sphere(new Vector3(-1001, 0, 0), 1000, new Vector3(1, 0, 0), new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0)));
+        scene.Add(new Sphere(new Vector3(1001, 0, 0), 1000, new Vector3(0, 0, 1), new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0)));
+        scene.Add(new Sphere(new Vector3(0, 0, 1001), 1000, new Vector3(0.5f, 0.5f, 0.5f), new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0)));
+        scene.Add(new Sphere(new Vector3(0, -1001, 0), 1000, new Vector3(0.5f, 0.5f, 0.5f), new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0)));
+        scene.Add(new Sphere(new Vector3(0, 1001, 0), 1000, new Vector3(1, 1, 1), new Vector3(1, 1, 1) * 2f,
+            new Vector3(0, 0, 0)));
+        scene.Add(new Sphere(new Vector3(-0.6f, -0.7f, -0.6f), 0.3f, new Vector3(1, 1, 0), new Vector3(0, 0, 0),
+            new Vector3(1, 1, 0)/2));
+        scene.Add(new Sphere(new Vector3(0.3f, -0.4f, 0.3f), 0.6f, new Vector3(0.8f, 0.9f, 0.9f),
+            new Vector3(0, 0, 0), new Vector3(0.8f, 0.9f, 0.9f)/2));
+    }
+
+
+    private void CalculationWorker(int threadId)
+    {
+        int rowsPerThread = imageHeight / calculationThreads;
+        int startRow = threadId * rowsPerThread;
+        int endRow = (threadId == calculationThreads - 1) ? imageHeight : startRow + rowsPerThread;
+        int rays = 1;
+        Random random = new Random();
+        
+        while (true)
+        {
+            for (int y = startRow; y < endRow; y++)
+            {
+                for (int x = 0; x < imageWidth; x++)
+                {
+                    (Vector3 origin, Vector3 direction) = CreateEyeRay(eye, lookAt, FOV, new Vector2(x, y));
+                    colors[y, x] += (ComputeColor(origin, direction, 0, random) - colors[y, x]) / rays;                }
+            }
+
+            rays++;
+            if (rays == 1000)
+            {
+                Console.WriteLine("done");
+                break;
+            }
+        }
+    }
+
+    private (Vector3 origin, Vector3 direction) CreateEyeRay(Vector3 eye, Vector3 lookAt, float FOV, Vector2 Pixel)
+    {
+        float x = Pixel.X / imageWidth * 2 - 1;
+        float y = Pixel.Y / imageHeight * 2 - 1;
+
+        Vector3 f = Vector3.Normalize(lookAt - eye);
+        Vector3 r = Vector3.Normalize(Vector3.Cross(up, f));
+        Vector3 u = Vector3.Cross(r, f);
+
+        float lambda1 = (float)Math.Tan(FOV / 2);
+        Vector3 d = f + x * r * lambda1 + y * u * lambda1;
+        return (eye, Vector3.Normalize(d));
+    }
+
+    private (Vector3? hitPoint, Sphere? shape) FindClosestHitPoint(Vector3 origin, Vector3 direction)
+    {
+        List<float> hitLambdas = new List<float>();
+        List<Sphere> hitSpheres = new List<Sphere>();
+        foreach (var sphere in scene)
+        {
+            Vector3 CE = (origin - sphere.location);
+            float b = 2 * Vector3.Dot(CE, direction);
+            float c = Vector3.Dot(CE, CE) - sphere.radius * sphere.radius;
+
+            float underRoot = b * b - 4 * c;
+            if (underRoot < 0)
+            {
+                continue;
+            }
+
+            float lambda1 = (float)((-b + Math.Sqrt(underRoot)) / 2);
+            float lambda2 = (float)((-b - Math.Sqrt(underRoot)) / 2);
+
+            if (lambda1 < 0 && lambda2 < 0) continue;
+            if (lambda1 < 0)
+            {
+                hitLambdas.Add(lambda2);
+            }
+            else if (lambda2 < 0)
+            {
+                hitLambdas.Add(lambda1);
+            }
+            else
+            {
+                hitLambdas.Add(Math.Min(lambda1, lambda2));
+            }
+
+            hitSpheres.Add(sphere);
+        }
+
+        if (hitLambdas.Count == 0) return (null, null);
+        return (origin + direction * hitLambdas.Min(), hitSpheres[hitLambdas.IndexOf(hitLambdas.Min())]);
+    }
+
+    Vector3 ComputeColor(Vector3 origin, Vector3 direction, int depth, Random random)
+    {
+        
+        (Vector3? hp, Sphere? s) = FindClosestHitPoint(origin, direction);
+
+
+        if (!hp.HasValue && !s.HasValue) return new Vector3(0, 0, 0);
+
+        Vector3 hitPoint = (Vector3)hp;
+        Sphere sphere = (Sphere)s;
+
+        if (random.NextDouble() < p || depth > bounceDepth)
+        {
+            return sphere.emission;
+        }
+
+
+        Vector3 surfaceNormal = Vector3.Normalize(hitPoint - sphere.location);
+
+        while (Vector3.Distance(hitPoint, sphere.location) <= sphere.radius)
+        {
+            hitPoint += surfaceNormal * 1e-3f;
+        }
+
+        Vector3 sampleDir;
+        float x;
+        float y;
+        float z;
+
+        while (true)
+        {
+            x = (float)random.NextDouble() * 2 - 1;
+            y = (float)random.NextDouble() * 2 - 1;
+            z = (float)random.NextDouble() * 2 - 1;
+            sampleDir = new Vector3(x, y, z);
+            if (sampleDir.Length() < 1)
+            {
+                sampleDir = Vector3.Normalize(sampleDir);
+                break;
+            }
+        }
+
+
+        float dot = Vector3.Dot(sampleDir, surfaceNormal);
+        if (dot < 0)
+        {
+            sampleDir = -sampleDir;
+            dot = -dot;
+        }
+
+        return sphere.emission + (float)(2 * Math.PI / (1.0f - p)) * dot
+                                                                   * BRDF(direction, sampleDir, surfaceNormal, sphere)
+                                                                   * ComputeColor(hitPoint, sampleDir, depth + 1, random);
+    }
+
+    Vector3 BRDF(Vector3 incomingDirection, Vector3 outgoingDirection, Vector3 surfaceNormal, Sphere hitObject)
+    {
+        Vector3 d = Vector3.Reflect(outgoingDirection, surfaceNormal);
+        double epsilon = 0.05;
+        if (Vector3.Dot(d, incomingDirection) > 1.0 - epsilon)
+        {
+            return hitObject.diffuse * (float)(1.0 / Math.PI) + hitObject.reflectance * 10;
+        }
+
+        return hitObject.diffuse * (float)(1.0 / Math.PI);
+    }
+}
+
+
+struct Sphere
+{
+    public Vector3 location;
+    public float radius;
+    public Vector3 diffuse;
+    public Vector3 emission;
+    public Vector3 reflectance;
+    public Texture? texture;
+
+    public Sphere(Vector3 location, float radius, Vector3 diffuse, Vector3 emission, Vector3 reflectance,
+        Texture? texture = null)
+    {
+        this.location = location;
+        this.radius = radius;
+        this.diffuse = diffuse;
+        this.emission = emission;
+        this.reflectance = reflectance;
+        this.texture = texture;
+    }
+}
+
+
+public class Texture
+{
+    public readonly int Width;
+    public readonly int Height;
+    public readonly Vector3[] Pixels;
+
+    public Texture(int width, int height, Vector3[] pixels)
+    {
+        Width = width;
+        Height = height;
+        Pixels = pixels;
+    }
+
+    public Vector3 Sample(float u, float v)
+    {
+        u -= MathF.Floor(u);
+        v -= MathF.Floor(v);
+
+        int x = (int)(u * Width);
+        int y = (int)(v * Height);
+        if (x >= Width)  x = Width  - 1;
+        if (y >= Height) y = Height - 1;
+        return Pixels[y * Width + x];
     }
 }
