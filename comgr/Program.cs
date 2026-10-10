@@ -9,6 +9,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Vector = Avalonia.Vector;
 
 //https://chat.deepseek.com/share/urrfadium1wwjfqfbe
+//https://chat.deepseek.com/share/fkcc01lo9z8x09x2hj
 
 class Program
 {
@@ -41,15 +42,17 @@ public class MainWindow : Window
     private Image imageControl;
     private WriteableBitmap bitmap;
     private Vector3[,] colors;
+    private Texture t1 = TextureLoader.LoadFromFile("test.jpg");
+    private Texture t2 = TextureLoader.LoadFromFile("1222.jpg");
 
     private const int imageWidth = 800;
     private const int imageHeight = 800;
     private int calculationThreads = 8;
 
     private float FOV = (float)(36.0f * (Math.PI / 180f));
-    private Vector3 eye = new Vector3(0.0f, 0.0f, -4);
-    private Vector3 up = new Vector3(0.0f, 1.0f, 0.0f);
-    private Vector3 lookAt = new Vector3(0.0f, 0.0f, 6.0f);
+    private Vector3 eye = new Vector3(0, 0, 0);
+    private Vector3 up = new Vector3(0, 1, 0);
+    private Vector3 lookAt = new Vector3(0, 0, 6);
     private float p = 0.5f;
     private int bounceDepth = int.MaxValue;
 
@@ -142,26 +145,22 @@ public class MainWindow : Window
 
         return (byte)(srgb * 255 + 0.5f);
     }
-    // above this is all ai;
 
     private List<Sphere> scene = new List<Sphere>();
 
     private void initScene()
     {
-        scene.Add(new Sphere(new Vector3(-1001, 0, 0), 1000, new Vector3(1, 0, 0), new Vector3(0, 0, 0),
+        scene.Add(new Sphere(new Vector3(0, 0, 1000), 250, new Vector3(1, 0, 0), new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0), t1));
+        
+        scene.Add(new Sphere(new Vector3(0, -10500, 500), 10000, new Vector3(1, 0, 0), new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0), t2));
+        
+        scene.Add(new Sphere(new Vector3(0, 0, -1050), 1000, new Vector3(1, 1, 1), new Vector3(1, 1, 1),
             new Vector3(0, 0, 0)));
-        scene.Add(new Sphere(new Vector3(1001, 0, 0), 1000, new Vector3(0, 0, 1), new Vector3(0, 0, 0),
+        
+        scene.Add(new Sphere(new Vector3(1100, 1100, 0), 1000, new Vector3(1, 1, 1), new Vector3(1, 1, 1)*10,
             new Vector3(0, 0, 0)));
-        scene.Add(new Sphere(new Vector3(0, 0, 1001), 1000, new Vector3(0.5f, 0.5f, 0.5f), new Vector3(0, 0, 0),
-            new Vector3(0, 0, 0)));
-        scene.Add(new Sphere(new Vector3(0, -1001, 0), 1000, new Vector3(0.5f, 0.5f, 0.5f), new Vector3(0, 0, 0),
-            new Vector3(0, 0, 0)));
-        scene.Add(new Sphere(new Vector3(0, 1001, 0), 1000, new Vector3(1, 1, 1), new Vector3(1, 1, 1) * 2f,
-            new Vector3(0, 0, 0)));
-        scene.Add(new Sphere(new Vector3(-0.6f, -0.7f, -0.6f), 0.3f, new Vector3(1, 1, 0), new Vector3(0, 0, 0),
-            new Vector3(1, 1, 0)/2));
-        scene.Add(new Sphere(new Vector3(0.3f, -0.4f, 0.3f), 0.6f, new Vector3(0.8f, 0.9f, 0.9f),
-            new Vector3(0, 0, 0), new Vector3(0.8f, 0.9f, 0.9f)/2));
     }
 
 
@@ -172,7 +171,7 @@ public class MainWindow : Window
         int endRow = (threadId == calculationThreads - 1) ? imageHeight : startRow + rowsPerThread;
         int rays = 1;
         Random random = new Random();
-        
+
         while (true)
         {
             for (int y = startRow; y < endRow; y++)
@@ -180,15 +179,11 @@ public class MainWindow : Window
                 for (int x = 0; x < imageWidth; x++)
                 {
                     (Vector3 origin, Vector3 direction) = CreateEyeRay(eye, lookAt, FOV, new Vector2(x, y));
-                    colors[y, x] += (ComputeColor(origin, direction, 0, random) - colors[y, x]) / rays;                }
+                    colors[y, x] += (ComputeColor(origin, direction, 0, random) - colors[y, x]) / rays;
+                }
             }
 
             rays++;
-            if (rays == 1000)
-            {
-                Console.WriteLine("done");
-                break;
-            }
         }
     }
 
@@ -246,9 +241,8 @@ public class MainWindow : Window
         return (origin + direction * hitLambdas.Min(), hitSpheres[hitLambdas.IndexOf(hitLambdas.Min())]);
     }
 
-    Vector3 ComputeColor(Vector3 origin, Vector3 direction, int depth, Random random)
+    Vector3 ComputeColor(Vector3 origin, Vector3 direction, int depth, Random random, float speedInMedium = 1)
     {
-        
         (Vector3? hp, Sphere? s) = FindClosestHitPoint(origin, direction);
 
 
@@ -257,6 +251,7 @@ public class MainWindow : Window
         Vector3 hitPoint = (Vector3)hp;
         Sphere sphere = (Sphere)s;
 
+
         if (random.NextDouble() < p || depth > bounceDepth)
         {
             return sphere.emission;
@@ -264,13 +259,15 @@ public class MainWindow : Window
 
 
         Vector3 surfaceNormal = Vector3.Normalize(hitPoint - sphere.location);
+        float dot;
+        Vector3 sampleDir;
+
 
         while (Vector3.Distance(hitPoint, sphere.location) <= sphere.radius)
         {
             hitPoint += surfaceNormal * 1e-3f;
         }
 
-        Vector3 sampleDir;
         float x;
         float y;
         float z;
@@ -288,8 +285,7 @@ public class MainWindow : Window
             }
         }
 
-
-        float dot = Vector3.Dot(sampleDir, surfaceNormal);
+        dot = Vector3.Dot(sampleDir, surfaceNormal);
         if (dot < 0)
         {
             sampleDir = -sampleDir;
@@ -297,20 +293,73 @@ public class MainWindow : Window
         }
 
         return sphere.emission + (float)(2 * Math.PI / (1.0f - p)) * dot
-                                                                   * BRDF(direction, sampleDir, surfaceNormal, sphere)
-                                                                   * ComputeColor(hitPoint, sampleDir, depth + 1, random);
+                                                                   * BRDF(direction, sampleDir, surfaceNormal, sphere,
+                                                                       hitPoint)
+                                                                   * ComputeColor(hitPoint, sampleDir, depth + 1,
+                                                                       random);
     }
 
-    Vector3 BRDF(Vector3 incomingDirection, Vector3 outgoingDirection, Vector3 surfaceNormal, Sphere hitObject)
+    Vector3 BRDF(Vector3 incomingDirection, Vector3 outgoingDirection, Vector3 surfaceNormal, Sphere hitObject,
+        Vector3 hitPoint)
     {
         Vector3 d = Vector3.Reflect(outgoingDirection, surfaceNormal);
         double epsilon = 0.05;
         if (Vector3.Dot(d, incomingDirection) > 1.0 - epsilon)
         {
-            return hitObject.diffuse * (float)(1.0 / Math.PI) + hitObject.reflectance * 10;
+            return hitObject.Diffuse(hitPoint) * (float)(1.0 / Math.PI) + hitObject.reflectance * 10;
         }
 
-        return hitObject.diffuse * (float)(1.0 / Math.PI);
+        return hitObject.Diffuse(hitPoint) * (float)(1.0 / Math.PI);
+    }
+
+    
+    public static Vector3? Refract(Vector3 I, Vector3 N, float n1, float n2)
+    {
+        I = Vector3.Normalize(I);
+        N = Vector3.Normalize(N);
+
+        float eta = n1 / n2;
+        float cosI = -Vector3.Dot(N, I);
+
+        if (cosI < 0f)
+        {
+            N = -N;
+            cosI = -cosI;
+            eta = n2 / n1;
+        }
+
+        float sin2T = eta * eta * (1f - cosI * cosI);
+
+        if (sin2T > 1f)
+            return null; // im ignoring internal reflection
+
+        float cosT = MathF.Sqrt(1f - sin2T);
+        return eta * I + (eta * cosI - cosT) * N;
+    }
+
+    public static float FresnelReflectance(Vector3 I, Vector3 N, float n1, float n2)
+    {
+        I = Vector3.Normalize(I);
+        N = Vector3.Normalize(N);
+
+        float cosI = -Vector3.Dot(N, I);
+        if (cosI < 0f)
+        {
+            N = -N;
+            cosI = -cosI;
+            (n1, n2) = (n2, n1);
+        }
+
+        cosI = Math.Clamp(cosI, 0f, 1f);
+
+        float r0 = (n1 - n2) / (n1 + n2);
+        r0 *= r0;
+
+        float oneMinusCos = 1f - cosI;
+        float oneMinusCos5 = oneMinusCos * oneMinusCos;
+        oneMinusCos5 *= oneMinusCos5 * oneMinusCos;
+
+        return r0 + (1f - r0) * oneMinusCos5;
     }
 }
 
@@ -319,13 +368,15 @@ struct Sphere
 {
     public Vector3 location;
     public float radius;
+    public float speedInMedium;
     public Vector3 diffuse;
     public Vector3 emission;
     public Vector3 reflectance;
     public Texture? texture;
+    public bool isSeetrough;
 
     public Sphere(Vector3 location, float radius, Vector3 diffuse, Vector3 emission, Vector3 reflectance,
-        Texture? texture = null)
+        Texture? texture = null, float speedInMedium = 1f, bool isSeetrough = false)
     {
         this.location = location;
         this.radius = radius;
@@ -333,6 +384,29 @@ struct Sphere
         this.emission = emission;
         this.reflectance = reflectance;
         this.texture = texture;
+        this.speedInMedium = speedInMedium;
+        this.isSeetrough = isSeetrough;
+    }
+
+    private Vector2 GetUV(Vector3 hitPoint)
+    {
+        Vector3 d = Vector3.Normalize(hitPoint - location);
+
+        float u = 0.5f + MathF.Atan2(d.Z, d.X) / (2f * MathF.PI);
+        float v = 0.5f - MathF.Asin(d.Y) / MathF.PI;
+
+        return new Vector2(u, v);
+    }
+
+    public Vector3 Diffuse(Vector3 hitPoint)
+    {
+        if (texture == null)
+        {
+            return diffuse;
+        }
+
+        Vector2 uv = GetUV(hitPoint);
+        return texture.Sample(uv.X, uv.Y);
     }
 }
 
@@ -357,7 +431,7 @@ public class Texture
 
         int x = (int)(u * Width);
         int y = (int)(v * Height);
-        if (x >= Width)  x = Width  - 1;
+        if (x >= Width) x = Width - 1;
         if (y >= Height) y = Height - 1;
         return Pixels[y * Width + x];
     }
