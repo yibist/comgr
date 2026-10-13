@@ -10,6 +10,7 @@ using Vector = Avalonia.Vector;
 
 //https://chat.deepseek.com/share/urrfadium1wwjfqfbe
 //https://chat.deepseek.com/share/fkcc01lo9z8x09x2hj
+//https://chat.deepseek.com/share/jpgt4ajk9udzdgx3oh
 
 class Program
 {
@@ -153,10 +154,13 @@ public class MainWindow : Window
         scene.Add(new Sphere(new Vector3(0, 0, 1000), 250, new Vector3(1, 0, 0), new Vector3(0, 0, 0),
             new Vector3(0, 0, 0), t1));
         
-        scene.Add(new Sphere(new Vector3(0, -10500, 500), 10000, new Vector3(1, 0, 0), new Vector3(0, 0, 0),
-            new Vector3(0, 0, 0), t2));
+        scene.Add(new Sphere(new Vector3(6, 0, 50), 5, new Vector3(0, 0, 0), new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0), null, 1.1f, true));
+        scene.Add(new Sphere(new Vector3(-6, 0, 50), 5, new Vector3(0, 0, 0), new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0), null, 1.5f, true));
+
         
-        scene.Add(new Sphere(new Vector3(0, 0, -1050), 1000, new Vector3(1, 1, 1), new Vector3(1, 1, 1),
+        scene.Add(new Sphere(new Vector3(0, 0, -1050), 1000, new Vector3(1, 1, 1), new Vector3(1, 1, 1)*10,
             new Vector3(0, 0, 0)));
         
         scene.Add(new Sphere(new Vector3(1100, 1100, 0), 1000, new Vector3(1, 1, 1), new Vector3(1, 1, 1)*10,
@@ -262,7 +266,25 @@ public class MainWindow : Window
         float dot;
         Vector3 sampleDir;
 
+        if (sphere.isSeetrough && random.NextDouble() >
+            FresnelReflectance(direction, surfaceNormal, speedInMedium, sphere.speedInMedium))
+        {
+            Vector3? refractanceDirection = Refract(direction, surfaceNormal, speedInMedium, sphere.speedInMedium);
 
+            if (!refractanceDirection.HasValue)
+            {
+                return sphere.emission; // should probably not ignore internal reflection
+            }
+
+            Vector3 refrOrigin = hitPoint + refractanceDirection.Value * 1e-3f;
+
+            float newSpeed = (speedInMedium == sphere.speedInMedium) ? 1f : sphere.speedInMedium; // quick and dirty way
+
+            return ComputeColor(refrOrigin, refractanceDirection.Value, depth + 1, random, newSpeed);
+            
+        }
+        
+        
         while (Vector3.Distance(hitPoint, sphere.location) <= sphere.radius)
         {
             hitPoint += surfaceNormal * 1e-3f;
@@ -313,46 +335,46 @@ public class MainWindow : Window
     }
 
     
-    public static Vector3? Refract(Vector3 I, Vector3 N, float n1, float n2)
+    public static Vector3? Refract(Vector3 direction, Vector3 surfaceNormal, float speedIn, float speedTo)
     {
-        I = Vector3.Normalize(I);
-        N = Vector3.Normalize(N);
+        direction = Vector3.Normalize(direction);
+        surfaceNormal = Vector3.Normalize(surfaceNormal);
 
-        float eta = n1 / n2;
-        float cosI = -Vector3.Dot(N, I);
+        float eta = speedIn / speedTo;
+        float cosI = -Vector3.Dot(surfaceNormal, direction);
 
         if (cosI < 0f)
         {
-            N = -N;
+            surfaceNormal = -surfaceNormal;
             cosI = -cosI;
-            eta = n2 / n1;
+            eta = speedTo / speedIn;
         }
 
         float sin2T = eta * eta * (1f - cosI * cosI);
 
         if (sin2T > 1f)
-            return null; // im ignoring internal reflection
+            return null;
 
         float cosT = MathF.Sqrt(1f - sin2T);
-        return eta * I + (eta * cosI - cosT) * N;
+        return eta * direction + (eta * cosI - cosT) * surfaceNormal;
     }
 
-    public static float FresnelReflectance(Vector3 I, Vector3 N, float n1, float n2)
+    public static float FresnelReflectance(Vector3 direction, Vector3 surfaceNormal, float speedIn, float speedTo)
     {
-        I = Vector3.Normalize(I);
-        N = Vector3.Normalize(N);
+        direction = Vector3.Normalize(direction);
+        surfaceNormal = Vector3.Normalize(surfaceNormal);
 
-        float cosI = -Vector3.Dot(N, I);
+        float cosI = -Vector3.Dot(surfaceNormal, direction);
         if (cosI < 0f)
         {
-            N = -N;
+            surfaceNormal = -surfaceNormal;
             cosI = -cosI;
-            (n1, n2) = (n2, n1);
+            (speedIn, speedTo) = (speedTo, speedIn);
         }
 
         cosI = Math.Clamp(cosI, 0f, 1f);
 
-        float r0 = (n1 - n2) / (n1 + n2);
+        float r0 = (speedIn - speedTo) / (speedIn + speedTo);
         r0 *= r0;
 
         float oneMinusCos = 1f - cosI;
