@@ -1,0 +1,196 @@
+# Rider
+.idea/
+*.sln.iml
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userprefs
+*.user
+*.usertasks
+*.cache
+*.pidb
+*.userprefs
+*.svd
+*.pdb
+*.opendb
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Oo]bj/
+[Bb]in/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / .NET
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+.vscode/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+packages/
+!packages/build/
+*.nuspec
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+**/Properties/launchSettings.json
+
+# Benchmarking
+BenchmarkDotNet.Artifacts/
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# NCrunch
+_NCrunch_*
+.*crunch*.local.xml
+nCrunchTemp_*
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+*.DotSettings
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Avalonia
+# Build artifacts specific to Avalonia
+*.avalonia.cache
+Avalonia.Build.Tasks/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*.swp
+*.swo
+
+# Compiled binaries
+*.dll
+*.exe
+*.pdb
+*.mdb
+*.so
+*.dylib
+
+# Exclude these from the compiled binaries (allow them in source)
+!**/packages/**/*.dll
+!**/packages/**/*.exe
+
+# Entity Framework
+*.edmx
+*.edmx.diagram
+*.edmgen
+*.ssdl
+*.msl
+*.csdl
+
+# Publish outputs
+publish/
+*.pubxml
+*.publishproj
+*.publishsettings
+PublishProfiles/
+
+# Azure
+*.azurePubxml
+*.azurePublishSettings
+
+# Certificates
+*.pfx
+*.cer
+*.crt
+*.key
+
+# Local development files
+*.local
+appsettings.*.local.json
+launchSettings.json
+
+# JetBrains Rider specific
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+.idea/**/contentModel.xml
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+.idea/**/gradle.xml
+.idea/**/libraries
+.idea/**/misc.xml
+.idea/**/modules.xml
+.idea/**/vcs.xml
+.idea/**/encodings.xml
+.idea/**/markdown-navigator/
+.idea/**/markdown-navigator-enforced.xml
+.idea/**/httpRequests/
+.idea/**/codeStyles/
+.idea/**/codeStyleSettings.xml
+.idea/**/inspectionProfiles/
+.idea/caches/
+.idea/shelf/
+.idea/**/.gitignore

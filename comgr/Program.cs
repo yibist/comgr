@@ -10,7 +10,7 @@ using Vector = Avalonia.Vector;
 
 //https://chat.deepseek.com/share/urrfadium1wwjfqfbe
 //https://chat.deepseek.com/share/fkcc01lo9z8x09x2hj
-//https://chat.deepseek.com/share/jpgt4ajk9udzdgx3oh
+//https://chat.deepseek.com/share/v4c7tkwr5scwz3ic2x
 
 class Program
 {
@@ -267,7 +267,7 @@ public class MainWindow : Window
         Vector3 sampleDir;
 
         if (sphere.isSeetrough && random.NextDouble() >
-            FresnelReflectance(direction, surfaceNormal, speedInMedium, sphere.speedInMedium))
+            Fresnel(direction, surfaceNormal, speedInMedium, sphere.speedInMedium))
         {
             Vector3? refractanceDirection = Refract(direction, surfaceNormal, speedInMedium, sphere.speedInMedium);
 
@@ -337,51 +337,44 @@ public class MainWindow : Window
     
     public static Vector3? Refract(Vector3 direction, Vector3 surfaceNormal, float speedIn, float speedTo)
     {
-        direction = Vector3.Normalize(direction);
-        surfaceNormal = Vector3.Normalize(surfaceNormal);
-
         float eta = speedIn / speedTo;
         float cosI = -Vector3.Dot(surfaceNormal, direction);
 
-        if (cosI < 0f)
+        if (cosI < 0f) // in case ray is in a sphere
         {
             surfaceNormal = -surfaceNormal;
             cosI = -cosI;
             eta = speedTo / speedIn;
         }
 
-        float sin2T = eta * eta * (1f - cosI * cosI);
-
-        if (sin2T > 1f)
+        float sinT2 = eta * eta * (1.0f - cosI * cosI);
+        if (sinT2 > 1.0f)
             return null;
-
-        float cosT = MathF.Sqrt(1f - sin2T);
+    
+        float cosT = MathF.Sqrt(1.0f - sinT2);
+    
         return eta * direction + (eta * cosI - cosT) * surfaceNormal;
     }
 
-    public static float FresnelReflectance(Vector3 direction, Vector3 surfaceNormal, float speedIn, float speedTo)
+    public static float Fresnel(Vector3 direction, Vector3 surfaceNormal, float speedIn, float speedTo)
     {
-        direction = Vector3.Normalize(direction);
-        surfaceNormal = Vector3.Normalize(surfaceNormal);
-
+        float eta = speedIn / speedTo;
+    
         float cosI = -Vector3.Dot(surfaceNormal, direction);
+    
         if (cosI < 0f)
         {
-            surfaceNormal = -surfaceNormal;
             cosI = -cosI;
-            (speedIn, speedTo) = (speedTo, speedIn);
+            eta = 1f / eta;
         }
-
-        cosI = Math.Clamp(cosI, 0f, 1f);
-
-        float r0 = (speedIn - speedTo) / (speedIn + speedTo);
-        r0 *= r0;
-
-        float oneMinusCos = 1f - cosI;
-        float oneMinusCos5 = oneMinusCos * oneMinusCos;
-        oneMinusCos5 *= oneMinusCos5 * oneMinusCos;
-
-        return r0 + (1f - r0) * oneMinusCos5;
+    
+        float r0 = (1f - eta) / (1f + eta);
+        r0 = r0 * r0;
+    
+        float x = 1f - cosI;
+        float x2 = x * x;
+    
+        return r0 + (1f - r0) * x2 * x2 * x; // x^5
     }
 }
 
