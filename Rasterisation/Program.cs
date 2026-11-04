@@ -32,7 +32,6 @@ public class App : Application
         {
             desktop.MainWindow = new MainWindow();
         }
-
         base.OnFrameworkInitializationCompleted();
     }
 }
@@ -42,11 +41,12 @@ public class MainWindow : Window
     private Image imageControl;
     private WriteableBitmap bitmap;
     private Vector3[,] colors;
-    private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0));
+    private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(0,1,0),new Vector3(0,0,1),new Vector3(1,1,0),new Vector3(1,0,1),new Vector3(0,1,1));
 
     private const int imageWidth = 800;
     private const int imageHeight = 800;
-    private int calculationThreads = 8;
+    private int calculationThreads;
+    private Barrier frameBarrier;
     private double cameraDistance = 100;
     
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
@@ -63,11 +63,16 @@ public class MainWindow : Window
     private float zFar = 100f;
     private Matrix4x4 P;
     
+    Matrix4x4 MVP;
+    
+    private Vertex[,] vertices;
     
     public MainWindow()
     {
         calculationThreads = Math.Max(1, Environment.ProcessorCount - 2);
-        calculationThreads = 1;
+        //calculationThreads = 1;
+        
+        frameBarrier = new Barrier(calculationThreads + 1);
         Title = "comgr";
         Width = imageWidth;
         Height = imageHeight;
@@ -92,27 +97,27 @@ public class MainWindow : Window
             AlphaFormat.Premul);
 
         imageControl.Source = bitmap;
-
+        vertices = new Vertex[mesh.Tris.Count,3];
         for (int i = 0; i < calculationThreads; i++)
         {
             int threadId = i;
-            Task.Run(() => CalculationWorker(threadId));
+            var t = new Thread(() => WorkerLoop(threadId))
+            {
+                IsBackground = true,
+            };
+            t.Start();
         }
-
-        var timer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(16)
-        };
-        timer.Tick += (s, e) => RenderFrame();
+        
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1) };
+        timer.Tick += (s, e) => RenderLoop();
         timer.Start();
     }
-    private unsafe void RenderFrame()
+    private unsafe void RenderLoop()
     {
         var now = _stopwatch.Elapsed;
         deltaTime = (now - lastFrameTime).TotalSeconds;
         lastFrameTime = now;
 
-        if (deltaTime > 0.1) deltaTime = 0.1;
 
         using (var fb = bitmap.Lock())
         {
@@ -139,8 +144,15 @@ public class MainWindow : Window
                 }
             }
         }
-        timePassed += (float) deltaTime;
         imageControl.InvalidateVisual();
+        
+        frameBarrier.SignalAndWait();
+        frameBarrier.SignalAndWait();
+        Console.WriteLine(deltaTime);
+        timePassed += (float) deltaTime;
+        Matrix4x4 M = Matrix4x4.CreateRotationY(timePassed);
+        MVP = M * V * P;
+        frameBarrier.SignalAndWait();
     }
 
     private static byte LinearToSRGB(float linear)
@@ -161,15 +173,39 @@ public class MainWindow : Window
     }
 
 
-    private void CalculationWorker(int threadId)
+    private void WorkerLoop(int threadId)
     {
         int rowsPerThread = imageHeight / calculationThreads;
         int startRow = threadId * rowsPerThread;
         int endRow = (threadId == calculationThreads - 1) ? imageHeight : startRow + rowsPerThread;
+        int start = mesh.Tris.Count * threadId / calculationThreads;
+        int end   = mesh.Tris.Count * (threadId + 1) / calculationThreads;
+
         Random random = new Random();
 
         while (true)
         {
+            for (int i = start; i < end; i++)
+            {
+                var tri = mesh.Tris[i];
+                Vertex v1 =mesh.Vertices[tri.A];
+                Vertex v2 =mesh.Vertices[tri.B];
+                Vertex v3 =mesh.Vertices[tri.C];
+
+            
+            
+
+                v1 = VertexShader(v1,MVP);
+                v2 = VertexShader(v2,MVP);
+                v3 = VertexShader(v3,MVP);
+                vertices[i,0] = v1;
+                vertices[i,1] = v2; 
+                vertices[i,2] = v3;
+            }
+            frameBarrier.SignalAndWait();
+            
+            
+            
             for (int y = startRow; y < endRow; y++)
             {
                 for (int x = 0; x < imageWidth; x++)
@@ -177,6 +213,8 @@ public class MainWindow : Window
                     colors[y, x] = ComputeColor(x,y);
                 }
             }
+            frameBarrier.SignalAndWait();
+            frameBarrier.SignalAndWait();
         }
     }
 
@@ -184,21 +222,13 @@ public class MainWindow : Window
     {
         x = (x / imageWidth) * 2 - 1;
         y = 1 - (y / imageHeight) * 2;
-        Matrix4x4 M = Matrix4x4.CreateRotationY(timePassed);
 
-        foreach (var tri in mesh.Tris)
+        for (int i = 0; i<vertices.GetLength(0); i++)
         {
-            Vertex v1 =mesh.Vertices[tri.A];
-            Vertex v2 =mesh.Vertices[tri.B];
-            Vertex v3 =mesh.Vertices[tri.C];
+            var v1 = vertices[i,0];
+            var v2 = vertices[i,1];
+            var v3 = vertices[i,2];
 
-            
-            
-            Matrix4x4 MVP = M * V * P;
-
-            v1 = VertexShader(v1,MVP);
-            v2 = VertexShader(v2,MVP);
-            v3 = VertexShader(v3,MVP);
 
 
             if (v1.Position.W <= 0 || v2.Position.W <= 0 || v3.Position.W <= 0)
@@ -220,7 +250,7 @@ public class MainWindow : Window
             Vector2 AC2 = new Vector2(AC.X, AC.Y);
 
             float det = AB2.X * AC2.Y - AC2.X * AB2.Y;
-            if (Math.Abs(det) < 1e-6f) continue;
+            if (det < 0f) continue; // this does backface culling
             float invDet = 1.0f / det;
 
             Vector2 P2 = new Vector2(x - A2.X, y - A2.Y);
@@ -232,7 +262,7 @@ public class MainWindow : Window
 
             if ((L1 >= 0 && L2 >= 0 && L3 >= 0) || (L1 <= 0 && L2 <= 0 && L3 <= 0))
             {
-                return new Vector3(1, 0, 0);
+                return v1.Color + v2.Color + v3.Color;
             }
         }
         return Vector3.Zero;

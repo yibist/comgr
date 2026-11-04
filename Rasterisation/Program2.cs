@@ -22,7 +22,6 @@ public class App2 : Application
         {
             desktop.MainWindow = new MainWindow2();
         }
-
         base.OnFrameworkInitializationCompleted();
     }
 }
