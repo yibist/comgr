@@ -7,20 +7,9 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using Avalonia.Threading;
 
-class Program
-{
-    static void Main(string[] args)
-    {
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
-    }
 
-    public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .LogToTrace();
-}
 
-public class App : Application
+public class App2 : Application
 {
     public override void Initialize()
     {
@@ -31,7 +20,7 @@ public class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow();
+            desktop.MainWindow = new MainWindow2();
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -121,9 +110,9 @@ class Renderer : Control
 }
 
 
-class MainWindow : Window
+class MainWindow2 : Window
 {
-    public MainWindow()
+    public MainWindow2()
     {
         Title = "Triangle";
         Width = 400;
