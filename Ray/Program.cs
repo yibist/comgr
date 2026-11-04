@@ -49,7 +49,7 @@ public class MainWindow : Window
     private const int imageWidth = 800;
     private const int imageHeight = 800;
     private int calculationThreads = 8;
-s
+
     private float FOV = (float)(36.0f * (Math.PI / 180f));
     private Vector3 eye = new Vector3(0, 0, 0);
     private Vector3 up = new Vector3(0, 1, 0);
