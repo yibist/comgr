@@ -41,7 +41,8 @@ public class MainWindow : Window
     private Image imageControl;
     private WriteableBitmap bitmap;
     private Vector3[,] colors;
-    private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(0,1,0),new Vector3(0,0,1),new Vector3(1,1,0),new Vector3(1,0,1),new Vector3(0,1,1));
+    //private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(0,1,0),new Vector3(0,0,1),new Vector3(1,1,0),new Vector3(1,0,1),new Vector3(0,1,1));
+    private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0));
 
     private const int imageWidth = 800;
     private const int imageHeight = 800;
@@ -53,8 +54,10 @@ public class MainWindow : Window
     private TimeSpan lastFrameTime;
     private double deltaTime;
     private float timePassed = 0f;
-
-    private Vector3 cameraPosition = new Vector3(0, 0, -4);
+    
+    private Matrix4x4 M;
+    private Matrix4x4 MNormal;
+    private Vector3 cameraPosition = new Vector3(0, 2, -4);
     private Vector3 cameraTarget = new Vector3(0, 0, 0);
     private Vector3 up = new Vector3(0, 1, 0);
     private Matrix4x4 V;
@@ -64,6 +67,8 @@ public class MainWindow : Window
     private Matrix4x4 P;
     
     Matrix4x4 MVP;
+
+    private Vector3 lightSourceDirection = new Vector3(2,5,-2);
     
     private Vertex[,] vertices;
     
@@ -150,8 +155,12 @@ public class MainWindow : Window
         frameBarrier.SignalAndWait();
         Console.WriteLine(deltaTime);
         timePassed += (float) deltaTime;
-        Matrix4x4 M = Matrix4x4.CreateRotationY(timePassed);
+        M = Matrix4x4.CreateRotationY(timePassed);
+        Matrix4x4.Invert(M, out Matrix4x4 inv);
+
+        MNormal = Matrix4x4.Multiply(Matrix4x4.Transpose(inv), M.GetDeterminant());
         MVP = M * V * P;
+        
         frameBarrier.SignalAndWait();
     }
 
@@ -191,13 +200,12 @@ public class MainWindow : Window
                 Vertex v1 =mesh.Vertices[tri.A];
                 Vertex v2 =mesh.Vertices[tri.B];
                 Vertex v3 =mesh.Vertices[tri.C];
-
+                
             
-            
 
-                v1 = VertexShader(v1,MVP);
-                v2 = VertexShader(v2,MVP);
-                v3 = VertexShader(v3,MVP);
+                v1 = VertexShader(v1);
+                v2 = VertexShader(v2);
+                v3 = VertexShader(v3);
                 vertices[i,0] = v1;
                 vertices[i,1] = v2; 
                 vertices[i,2] = v3;
@@ -262,7 +270,23 @@ public class MainWindow : Window
 
             if ((L1 >= 0 && L2 >= 0 && L3 >= 0) || (L1 <= 0 && L2 <= 0 && L3 <= 0))
             {
-                return v1.Color + v2.Color + v3.Color;
+                float w1 = 1.0f / v1.Position.W;
+                float w2 = 1.0f / v2.Position.W;
+                float w3 = 1.0f / v3.Position.W;
+
+                float bw1 = L1 * w1;
+                float bw2 = L2 * w2;
+                float bw3 = L3 * w3;
+                float bwSum = bw1 + bw2 + bw3;
+
+                Vector3 N = (v1.Normal * bw1 + v2.Normal * bw2 + v3.Normal * bw3) / bwSum;
+                N = Vector3.Normalize(N);
+                Vector3 L = Vector3.Normalize(lightSourceDirection);
+
+                float ndotl = MathF.Max(0f, Vector3.Dot(N, L));
+
+                Vector3 baseColor = v1.Color * L1 + v2.Color * L2 + v3.Color * L3;
+                return baseColor * ndotl;
             }
         }
         return Vector3.Zero;
@@ -270,11 +294,10 @@ public class MainWindow : Window
     }
 
 
-    Vertex VertexShader(Vertex v, Matrix4x4 MVP)
+    Vertex VertexShader(Vertex v)
     {
-        Vector4 position = Vector4.Transform(v.Position, MVP);
-        Vertex res = new Vertex(position, v.WorldCoordinates,
-            v.Color, v.TexCoord, v.Normal);
+        Vertex res = new Vertex(Vector4.Transform(v.Position, MVP), Vector4.Transform(v.Position, M).AsVector3(),
+            v.Color, v.TexCoord, Vector3.Transform(v.Normal, MNormal));
         return res;
     }
 }
