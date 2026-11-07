@@ -41,9 +41,9 @@ public class MainWindow : Window
     private Image imageControl;
     private WriteableBitmap bitmap;
     private Vector3[,] colors;
-    //private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(0,1,0),new Vector3(0,0,1),new Vector3(1,1,0),new Vector3(1,0,1),new Vector3(0,1,1));
-    private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0));
-
+    // private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(0,1,0),new Vector3(0,0,1),new Vector3(1,1,0),new Vector3(1,0,1),new Vector3(0,1,1));
+    // private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0));
+    private Mesh mesh = Mesh.CreateSphere(3,new Vector3(1,0,0));
     private const int imageWidth = 800;
     private const int imageHeight = 800;
     private int calculationThreads;
@@ -68,14 +68,14 @@ public class MainWindow : Window
     
     Matrix4x4 MVP;
 
-    private Vector3 lightSourceDirection = new Vector3(2,5,-2);
+    private Vector3 lightSourceLocation = new Vector3(200,500,-200);
     
     private Vertex[,] vertices;
     
     public MainWindow()
     {
         calculationThreads = Math.Max(1, Environment.ProcessorCount - 2);
-        //calculationThreads = 1;
+        // calculationThreads = 1;
         
         frameBarrier = new Barrier(calculationThreads + 1);
         Title = "comgr";
@@ -230,7 +230,7 @@ public class MainWindow : Window
     {
         x = (x / imageWidth) * 2 - 1;
         y = 1 - (y / imageHeight) * 2;
-
+        float closestDistance = float.MaxValue;
         for (int i = 0; i<vertices.GetLength(0); i++)
         {
             var v1 = vertices[i,0];
@@ -267,26 +267,48 @@ public class MainWindow : Window
             float L3 = (-AB2.Y * P2.X + AB2.X * P2.Y) * invDet;
             float L1 = 1.0f - L2 - L3;
 
-
+            
             if ((L1 >= 0 && L2 >= 0 && L3 >= 0) || (L1 <= 0 && L2 <= 0 && L3 <= 0))
             {
-                float w1 = 1.0f / v1.Position.W;
-                float w2 = 1.0f / v2.Position.W;
-                float w3 = 1.0f / v3.Position.W;
 
-                float bw1 = L1 * w1;
-                float bw2 = L2 * w2;
-                float bw3 = L3 * w3;
+                float bw1 = L1 * 1.0f / v1.Position.W;
+                float bw2 = L2 * 1.0f / v2.Position.W;
+                float bw3 = L3 * 1.0f / v3.Position.W;
                 float bwSum = bw1 + bw2 + bw3;
+                Vector3 fragWorldPos = (v1.WorldCoordinates * bw1
+                                        + v2.WorldCoordinates * bw2
+                                        + v3.WorldCoordinates * bw3) / bwSum;
 
-                Vector3 N = (v1.Normal * bw1 + v2.Normal * bw2 + v3.Normal * bw3) / bwSum;
-                N = Vector3.Normalize(N);
-                Vector3 L = Vector3.Normalize(lightSourceDirection);
+                float distance = (cameraPosition - fragWorldPos).Length();
+                if (closestDistance < distance)
+                {
+                    continue;
+                }
+                closestDistance = distance;
+                
+                Vector3 N = Vector3.Normalize((v1.Normal * bw1 + v2.Normal * bw2 + v3.Normal * bw3) / bwSum);
+                
+                Vector3 toLight = lightSourceLocation - fragWorldPos;
+                Vector3 L = Vector3.Normalize(toLight);
 
-                float ndotl = MathF.Max(0f, Vector3.Dot(N, L));
+                float lambertStrength = MathF.Max(0f, Vector3.Dot(N, L));
 
                 Vector3 baseColor = v1.Color * L1 + v2.Color * L2 + v3.Color * L3;
-                return baseColor * ndotl;
+                Vector3 diffuse = baseColor * lambertStrength;
+                
+                
+
+                Vector3 V = Vector3.Normalize(cameraPosition - fragWorldPos);
+
+                Vector3 R = Vector3.Reflect(-L, N);
+                float phongStrength = MathF.Max(0f, Vector3.Dot(R, V));
+                float specular = MathF.Pow(phongStrength, 100);
+
+                specular *= (lambertStrength > 0f) ? 1f : 0f;
+
+                Vector3 specularColor = new Vector3(1,1,1) * 100 * specular;
+
+                return diffuse + specularColor;
             }
         }
         return Vector3.Zero;
