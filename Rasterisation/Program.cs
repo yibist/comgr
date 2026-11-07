@@ -10,6 +10,8 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Vector = Avalonia.Vector;
 
 //https://chat.deepseek.com/share/urrfadium1wwjfqfbe
+//https://chat.deepseek.com/share/32avbs4vnz2keynytd
+// the texture code is copied from the path tracer
 
 class Program
 {
@@ -41,22 +43,25 @@ public class MainWindow : Window
     private Image imageControl;
     private WriteableBitmap bitmap;
     private Vector3[,] colors;
-    // private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(0,1,0),new Vector3(0,0,1),new Vector3(1,1,0),new Vector3(1,0,1),new Vector3(0,1,1));
-    // private Mesh mesh = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0));
-    private Mesh mesh = Mesh.CreateSphere(3,new Vector3(1,0,0));
+    private Mesh colorCube = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(0,1,0),new Vector3(0,0,1),new Vector3(1,1,0),new Vector3(1,0,1),new Vector3(0,1,1));
+    private Mesh cube = Mesh.CreateCube(new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0),new Vector3(1,0,0));
+    private Mesh sphere = Mesh.CreateSphere(3,new Vector3(1,0,0));
+    
+    private Texture t1 = TextureLoader.LoadFromFile("test.jpg");
+
+    private List<SceneGraphNode> scene = new List<SceneGraphNode>();
     private const int imageWidth = 800;
     private const int imageHeight = 800;
     private int calculationThreads;
     private Barrier frameBarrier;
-    private double cameraDistance = 100;
+    private double cameraDistance = 100; 
     
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
     private TimeSpan lastFrameTime;
     private double deltaTime;
     private float timePassed = 0f;
     
-    private Matrix4x4 M;
-    private Matrix4x4 MNormal;
+    private Matrix4x4[] M;
     private Vector3 cameraPosition = new Vector3(0, 2, -4);
     private Vector3 cameraTarget = new Vector3(0, 0, 0);
     private Vector3 up = new Vector3(0, 1, 0);
@@ -65,18 +70,25 @@ public class MainWindow : Window
     private float zNear = 0.001f;
     private float zFar = 100f;
     private Matrix4x4 P;
+
+    private int totalTris;
+    private int[] triOffset;
+    private (Vertex,Texture)[,] allTris;
     
-    Matrix4x4 MVP;
 
     private Vector3 lightSourceLocation = new Vector3(200,500,-200);
     
-    private Vertex[,] vertices;
     
     public MainWindow()
     {
+        scene.Add(new SceneGraphNode(colorCube,t1));
+        scene.Add(new SceneGraphNode(cube));
+        scene.Add(new SceneGraphNode(cube,t1));
+        
+        scene[0].AddChild(new SceneGraphNode(sphere),Matrix4x4.CreateTranslation(2, 0f, 0f));
         calculationThreads = Math.Max(1, Environment.ProcessorCount - 2);
         // calculationThreads = 1;
-        
+        M = new Matrix4x4[scene.Count];
         frameBarrier = new Barrier(calculationThreads + 1);
         Title = "comgr";
         Width = imageWidth;
@@ -100,9 +112,19 @@ public class MainWindow : Window
             new Vector(96, 96),
             PixelFormat.Bgra8888,
             AlphaFormat.Premul);
-
         imageControl.Source = bitmap;
-        vertices = new Vertex[mesh.Tris.Count,3];
+        
+        totalTris = 0;
+        triOffset = new int[scene.Count + 1];
+        for (int i = 0; i < scene.Count; i++)
+        {
+            triOffset[i] = totalTris;
+            totalTris += scene[i].triCountOfSelfAndChildren;
+        }
+        triOffset[scene.Count] = totalTris;
+
+        allTris = new (Vertex,Texture)[totalTris, 3];
+        
         for (int i = 0; i < calculationThreads; i++)
         {
             int threadId = i;
@@ -153,13 +175,11 @@ public class MainWindow : Window
         
         frameBarrier.SignalAndWait();
         frameBarrier.SignalAndWait();
-        Console.WriteLine(deltaTime);
         timePassed += (float) deltaTime;
-        M = Matrix4x4.CreateRotationY(timePassed);
-        Matrix4x4.Invert(M, out Matrix4x4 inv);
+        M[0] = Matrix4x4.CreateRotationY(timePassed);
+        M[1] = Matrix4x4.CreateTranslation((float)Math.Sin(timePassed)*1,0,1);
+        M[2] = Matrix4x4.CreateTranslation(0,1,(float)Math.Sin(timePassed/20)*-10);
 
-        MNormal = Matrix4x4.Multiply(Matrix4x4.Transpose(inv), M.GetDeterminant());
-        MVP = M * V * P;
         
         frameBarrier.SignalAndWait();
     }
@@ -181,34 +201,30 @@ public class MainWindow : Window
         return (byte)(srgb * 255 + 0.5f);
     }
 
-
     private void WorkerLoop(int threadId)
     {
         int rowsPerThread = imageHeight / calculationThreads;
         int startRow = threadId * rowsPerThread;
         int endRow = (threadId == calculationThreads - 1) ? imageHeight : startRow + rowsPerThread;
-        int start = mesh.Tris.Count * threadId / calculationThreads;
-        int end   = mesh.Tris.Count * (threadId + 1) / calculationThreads;
-
+        int start = scene.Count * threadId / calculationThreads;
+        int end   = scene.Count * (threadId + 1) / calculationThreads;
         Random random = new Random();
 
         while (true)
         {
             for (int i = start; i < end; i++)
             {
-                var tri = mesh.Tris[i];
-                Vertex v1 =mesh.Vertices[tri.A];
-                Vertex v2 =mesh.Vertices[tri.B];
-                Vertex v3 =mesh.Vertices[tri.C];
-                
-            
+                var tris = scene[i].ApplyMVP(M[i], V * P); 
+                int tri = triOffset[i];                 
 
-                v1 = VertexShader(v1);
-                v2 = VertexShader(v2);
-                v3 = VertexShader(v3);
-                vertices[i,0] = v1;
-                vertices[i,1] = v2; 
-                vertices[i,2] = v3;
+                for (int t = 0; t < tris.Count; t++)
+                {
+                    var (v,texture) = tris[t];
+                    allTris[tri, 0] = (v[0],texture);
+                    allTris[tri, 1] = (v[1],texture);
+                    allTris[tri, 2] = (v[2],texture);
+                    tri++;
+                }
             }
             frameBarrier.SignalAndWait();
             
@@ -231,11 +247,13 @@ public class MainWindow : Window
         x = (x / imageWidth) * 2 - 1;
         y = 1 - (y / imageHeight) * 2;
         float closestDistance = float.MaxValue;
-        for (int i = 0; i<vertices.GetLength(0); i++)
+        Vector3 diffuse = Vector3.Zero;
+        Vector3 specularColor = Vector3.Zero;
+        for (int i = 0; i < allTris.GetLength(0); i++)
         {
-            var v1 = vertices[i,0];
-            var v2 = vertices[i,1];
-            var v3 = vertices[i,2];
+            Vertex v1 = allTris[i,0].Item1;
+            Vertex v2 = allTris[i,1].Item1;
+            Vertex v3 = allTris[i,2].Item1;
 
 
 
@@ -274,27 +292,37 @@ public class MainWindow : Window
                 float bw1 = L1 * 1.0f / v1.Position.W;
                 float bw2 = L2 * 1.0f / v2.Position.W;
                 float bw3 = L3 * 1.0f / v3.Position.W;
-                float bwSum = bw1 + bw2 + bw3;
+                float q = bw1 + bw2 + bw3;
                 Vector3 fragWorldPos = (v1.WorldCoordinates * bw1
                                         + v2.WorldCoordinates * bw2
-                                        + v3.WorldCoordinates * bw3) / bwSum;
+                                        + v3.WorldCoordinates * bw3) / q;
 
                 float distance = (cameraPosition - fragWorldPos).Length();
-                if (closestDistance < distance)
-                {
+                if (distance >= closestDistance)
                     continue;
-                }
+                
                 closestDistance = distance;
                 
-                Vector3 N = Vector3.Normalize((v1.Normal * bw1 + v2.Normal * bw2 + v3.Normal * bw3) / bwSum);
+                Vector3 N = Vector3.Normalize((v1.Normal * bw1 + v2.Normal * bw2 + v3.Normal * bw3) / q);
                 
                 Vector3 toLight = lightSourceLocation - fragWorldPos;
                 Vector3 L = Vector3.Normalize(toLight);
 
                 float lambertStrength = MathF.Max(0f, Vector3.Dot(N, L));
-
-                Vector3 baseColor = v1.Color * L1 + v2.Color * L2 + v3.Color * L3;
-                Vector3 diffuse = baseColor * lambertStrength;
+                
+                Texture texture = allTris[i, 0].Item2;
+                Vector3 baseColor;
+                if (texture == null)
+                {
+                    baseColor = (v1.Color * bw1 + v2.Color * bw2 + v3.Color * bw3) / q;
+                }
+                else
+                {
+                    Vector2 uv = (v1.TexCoord * bw1 + v2.TexCoord * bw2 + v3.TexCoord * bw3) / q;
+                    
+                    baseColor = texture.Sample(uv.X, uv.Y);
+                }
+                diffuse = baseColor * lambertStrength;
                 
                 
 
@@ -306,20 +334,64 @@ public class MainWindow : Window
 
                 specular *= (lambertStrength > 0f) ? 1f : 0f;
 
-                Vector3 specularColor = new Vector3(1,1,1) * 100 * specular;
-
-                return diffuse + specularColor;
+                specularColor = new Vector3(1,1,1) * 100 * specular;
             }
         }
-        return Vector3.Zero;
+        return diffuse + specularColor;
         
     }
+}
+public class SceneGraphNode
+{
+    private List<(SceneGraphNode child, Matrix4x4 transform)> children = new List<(SceneGraphNode child, Matrix4x4 transform)>();
+    public Mesh mesh;
+    public int triCountOfSelfAndChildren;
+    public Texture texture;
 
-
-    Vertex VertexShader(Vertex v)
+    public SceneGraphNode(Mesh mesh, Texture texture = null)
     {
-        Vertex res = new Vertex(Vector4.Transform(v.Position, MVP), Vector4.Transform(v.Position, M).AsVector3(),
-            v.Color, v.TexCoord, Vector3.Transform(v.Normal, MNormal));
+        this.mesh = mesh;
+        triCountOfSelfAndChildren += mesh.Tris.Count;
+        this.texture = texture;
+    }
+
+    public void AddChild(SceneGraphNode child, Matrix4x4 transform)
+    {
+        children.Add((child, transform));
+        triCountOfSelfAndChildren += child.triCountOfSelfAndChildren;
+    }
+    
+    public List<(Vertex[],Texture)> ApplyMVP(Matrix4x4 m, Matrix4x4 vp)
+    {
+        var res = new List<(Vertex[],Texture)>();
+        if (mesh != null)
+        {
+            foreach (var tris in mesh.Tris)
+            {
+                Vertex[] triangle =  new []
+                {
+                    VertexShader(mesh.Vertices[tris.A],m,vp),
+                    VertexShader(mesh.Vertices[tris.B],m,vp),
+                    VertexShader(mesh.Vertices[tris.C],m,vp)
+                };
+                res.Add((triangle,texture));
+            }
+        }
+
+        foreach ((SceneGraphNode child, Matrix4x4 transform) in children)
+        {
+            res.AddRange(child.ApplyMVP(transform*m, vp));
+        }
+
+        return res;
+    }
+    public Vertex VertexShader(Vertex vertex, Matrix4x4 m, Matrix4x4 vp)
+    {
+        Matrix4x4.Invert(m, out Matrix4x4 inv);
+        Matrix4x4 MNormal = Matrix4x4.Multiply(Matrix4x4.Transpose(inv), m.GetDeterminant());
+        
+        Vertex res = new Vertex(Vector4.Transform(vertex.Position, m*vp), Vector4.Transform(vertex.Position, m).AsVector3(),
+            vertex.Color, vertex.TexCoord, Vector3.Transform(vertex.Normal, MNormal));
         return res;
     }
 }
