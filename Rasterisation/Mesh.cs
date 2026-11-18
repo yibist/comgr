@@ -53,7 +53,7 @@ public class Mesh
     public static void AddCube(List<Vertex> _vertices, List<(int A, int B, int C)> _tris, Vector3 _colorFront, Vector3 _colorBack, Vector3 _colorTop, Vector3 _colorBottom, Vector3 _colorRight, Vector3 _colorLeft)
     {
         //front
-        _vertices.Add(new Vertex(new Vector3(-1, -1, -1), _colorFront, new Vector2(0, 0), -Vector3.UnitZ));
+        _vertices.Add(new Vertex(new Vector3(-1, -1, -1), new Vector3(1,1,1), new Vector2(0, 0), -Vector3.UnitZ));
         _vertices.Add(new Vertex(new Vector3(1, -1, -1), _colorFront, new Vector2(1, 0), -Vector3.UnitZ));
         _vertices.Add(new Vertex(new Vector3(1, 1, -1), _colorFront, new Vector2(1, 1), -Vector3.UnitZ));
         _vertices.Add(new Vertex(new Vector3(-1, 1, -1), _colorFront, new Vector2(0, 1), -Vector3.UnitZ));

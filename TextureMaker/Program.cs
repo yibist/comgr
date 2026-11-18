@@ -68,23 +68,55 @@ public class MainWindow : Window
                 for (int x = 0; x < Width; x++)
                 {
                     
-                    byte blue = 255;
-                    byte red = (byte)(x * 255/Width);
-                    byte green = 110;
-
-                    int xi = x % 50;
-                    int yi = y % 50;
-                    int r = x / 25;
-
                     
-                      
+                    // float a = 45f * MathF.PI / 180f;
+                    // float cos = MathF.Cos(a), sin = MathF.Sin(a);
+                    // float s = 2f;  // scale factor
+                    //
+                    // float rx = (x * cos - y * sin) * 2;
+                    // float ry = (x * sin + y * cos) * 2;
+                    double hue = ((double)(x + y) / (Width + Height)) * 360.0;
+                    double c = 1.0;                              // chroma
+                    double hp = hue / 60.0;
+                    double xComp = c * (1 - Math.Abs(hp % 2 - 1));
+                    double r1 = 0, g1 = 0, b1 = 0;
+
+                    if (hp < 1)      { r1 = c; g1 = xComp; b1 = 0; }
+                    else if (hp < 2) { r1 = xComp; g1 = c; b1 = 0; }
+                    else if (hp < 3) { r1 = 0; g1 = c; b1 = xComp; }
+                    else if (hp < 4) { r1 = 0; g1 = xComp; b1 = c; }
+                    else if (hp < 5) { r1 = xComp; g1 = 0; b1 = c; }
+                    else             { r1 = c; g1 = 0; b1 = xComp; }
+
+                    byte red   = (byte)(r1 * 255);
+                    byte green = (byte)(g1 * 255);
+                    byte blue  = (byte)(b1 * 255);
+                    float xi = x % 100;
+                    float yi = y % 100;
                     
-                    if (xi*xi + yi*yi < 50*50 )
+
+
+
+                    float TOLERANCE = 1f;
+                    if (Math.Abs(xi + yi - 100) < TOLERANCE || Math.Abs(xi) < TOLERANCE || Math.Abs(yi) < TOLERANCE)
                     {
                         blue = 0;
                         red = 0;
                         green = 0;
                     }
+
+                    
+
+                    float  r = x / 25f;
+                    
+                    
+                    
+                    float diviser = 100 / 2f ;
+                    
+                    
+                    // byte blue = 0;
+                    // byte red = (byte) Math.Clamp(Math.Sin(Math.Sqrt(xi * xi + yi * yi) / diviser * Math.PI) * 128 + 128,0,255);
+                    // byte green = (byte) Math.Clamp(Math.Sin(Math.Sqrt(xi * xi + yi * yi) / diviser * Math.PI)  * 128 + 128,0,255);
                     
                     byte alpha = 255;
                     SetColor(fb, x, y, red, green, blue, 255);
