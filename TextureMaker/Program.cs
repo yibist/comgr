@@ -68,24 +68,26 @@ public class MainWindow : Window
                 for (int x = 0; x < Width; x++)
                 {
                     
-                    byte blue = 255;
+                    byte blue = (byte) (255 - x * 255/Width);
                     byte red = (byte)(x * 255/Width);
-                    byte green = 110;
+                    byte green = (byte)(y * 255 / Height);
 
                     int xi = x % 50;
                     int yi = y % 50;
-                    int r = x / 25;
 
-                    
-                      
-                    
-                    if (xi*xi + yi*yi < 50*50 )
+
+                    float TOLERANCE = 1f;
+                    if (Math.Abs(xi+yi - 50f) < TOLERANCE || Math.Abs(yi) < TOLERANCE || Math.Abs(xi) < TOLERANCE)
                     {
-                        blue = 0;
-                        red = 0;
-                        green = 0;
+                        // blue = 0;
+                        // red = 0;
+                        // green = 0;
+                        
+                        blue = (byte)(255 - blue);
+                        red = (byte)(255 - red);
+                        green = (byte)(255 - green);
                     }
-                    
+
                     byte alpha = 255;
                     SetColor(fb, x, y, red, green, blue, 255);
                 }

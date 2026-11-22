@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ray", "Ray\Ray.csproj", "{E
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextureMaker", "TextureMaker\TextureMaker.csproj", "{D92593D5-D638-42C3-AD75-AE4B95E75226}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HarwareExeleration", "HarwareExeleration\HarwareExeleration.csproj", "{79AA97DB-1319-4F5B-BAFF-0288A4984617}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{D92593D5-D638-42C3-AD75-AE4B95E75226}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D92593D5-D638-42C3-AD75-AE4B95E75226}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D92593D5-D638-42C3-AD75-AE4B95E75226}.Release|Any CPU.Build.0 = Release|Any CPU
+		{79AA97DB-1319-4F5B-BAFF-0288A4984617}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{79AA97DB-1319-4F5B-BAFF-0288A4984617}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{79AA97DB-1319-4F5B-BAFF-0288A4984617}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{79AA97DB-1319-4F5B-BAFF-0288A4984617}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
