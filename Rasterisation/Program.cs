@@ -9,9 +9,6 @@ using System.Numerics;
 using Avalonia.Controls.ApplicationLifetimes;
 using Vector = Avalonia.Vector;
 
-//https://chat.deepseek.com/share/urrfadium1wwjfqfbe
-//https://chat.deepseek.com/share/32avbs4vnz2keynytd
-// the texture code is copied from the path tracer
 
 class Program
 {
@@ -81,10 +78,9 @@ public class MainWindow : Window
     
     public MainWindow()
     {
-        scene.Add(new SceneGraphNode(colorCube,t1));
-        scene.Add(new SceneGraphNode(cube));
+        scene.Add(new SceneGraphNode(colorCube));
         scene.Add(new SceneGraphNode(cube,t1));
-        
+        scene.Add(new SceneGraphNode(cube,t1));
         scene[0].AddChild(new SceneGraphNode(sphere),Matrix4x4.CreateTranslation(2, 0f, 0f));
         calculationThreads = Math.Max(1, Environment.ProcessorCount - 2);
         // calculationThreads = 1;
@@ -208,7 +204,6 @@ public class MainWindow : Window
         int endRow = (threadId == calculationThreads - 1) ? imageHeight : startRow + rowsPerThread;
         int start = scene.Count * threadId / calculationThreads;
         int end   = scene.Count * (threadId + 1) / calculationThreads;
-        Random random = new Random();
 
         while (true)
         {
@@ -246,7 +241,7 @@ public class MainWindow : Window
     {
         x = (x / imageWidth) * 2 - 1;
         y = 1 - (y / imageHeight) * 2;
-        float closestDistance = float.MaxValue;
+        float closestDistance = float.MinValue;
         Vector3 diffuse = Vector3.Zero;
         Vector3 specularColor = Vector3.Zero;
         for (int i = 0; i < allTris.GetLength(0); i++)
@@ -289,16 +284,16 @@ public class MainWindow : Window
             if ((L1 >= 0 && L2 >= 0 && L3 >= 0) || (L1 <= 0 && L2 <= 0 && L3 <= 0))
             {
 
-                float bw1 = L1 * 1.0f / v1.Position.W;
-                float bw2 = L2 * 1.0f / v2.Position.W;
-                float bw3 = L3 * 1.0f / v3.Position.W;
+                float bw1 = L1 / v1.Position.W;
+                float bw2 = L2 / v2.Position.W;
+                float bw3 = L3 / v3.Position.W;
                 float q = bw1 + bw2 + bw3;
                 Vector3 fragWorldPos = (v1.WorldCoordinates * bw1
                                         + v2.WorldCoordinates * bw2
                                         + v3.WorldCoordinates * bw3) / q;
 
                 float distance = (cameraPosition - fragWorldPos).Length();
-                if (distance >= closestDistance)
+                if (distance <= closestDistance)
                     continue;
                 
                 closestDistance = distance;
@@ -330,7 +325,7 @@ public class MainWindow : Window
 
                 Vector3 R = Vector3.Reflect(-L, N);
                 float phongStrength = MathF.Max(0f, Vector3.Dot(R, V));
-                float specular = MathF.Pow(phongStrength, 100);
+                float specular = MathF.Pow(phongStrength, 100); // would make sense to save the reflectivity in the vertexes but i didnt want to change that code
 
                 specular *= (lambertStrength > 0f) ? 1f : 0f;
 
