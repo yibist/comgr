@@ -241,7 +241,7 @@ public class MainWindow : Window
     {
         x = (x / imageWidth) * 2 - 1;
         y = 1 - (y / imageHeight) * 2;
-        float closestDistance = float.MinValue;
+        float closestDistance = float.MaxValue;
         Vector3 diffuse = Vector3.Zero;
         Vector3 specularColor = Vector3.Zero;
         for (int i = 0; i < allTris.GetLength(0); i++)
@@ -293,7 +293,7 @@ public class MainWindow : Window
                                         + v3.WorldCoordinates * bw3) / q;
 
                 float distance = (cameraPosition - fragWorldPos).Length();
-                if (distance <= closestDistance)
+                if (distance >= closestDistance)
                     continue;
                 
                 closestDistance = distance;
